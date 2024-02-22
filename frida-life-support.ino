@@ -3,34 +3,47 @@
 
 // Código de Funcionamento para Sistema de Monitoramento e Irrigação com Arduino
 
-#define pinoAnalog A0  // Define o pino A0 como "pinoAnalog"
-#define pinoRele 8     // Define o pino 8 como "pinoRele"
-#define pinoSensor 7   // Define o pino 7 como "pinoSensor"
-#define pinoDisplay 9  // Define o pino 7 como "pinoSensor"
+#define pinoAnalog A0
+#define pinoRele 8
+#define pinoSensor 7
 
-int ValAnalogIn;  // Introduz o valor analógico ao código
+int ValAnalogIn;
 
 byte ledState = LOW;
 
 unsigned long previousMillis = 0;
-unsigned long intervalOff = 7200000;  //21600000;  //desligado por 6h
+unsigned long intervalOff = 7200000;  //desligado por 2h
+int intervalOffInMinutes = (int)((intervalOff / 1000) / 60);
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);  // Criando um LCD de 16x2 no endereço 0x20
+unsigned long irrigationCounter = 0;
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // Criando um LCD de 16x2 no endereço 0x27
+
+byte waterDropChar[8] = {
+  0b00100,
+  0b01110,
+  0b01110,
+  0b11111,
+  0b11111,
+  0b11111,
+  0b01110,
+  0b00000
+};
 
 
 int readSensor() {
   digitalWrite(pinoSensor, HIGH);
 
-  ValAnalogIn = analogRead(pinoAnalog);              // Relaciona o valor analógico com o recebido do sensor
-  int porcento = map(ValAnalogIn, 1023, 0, 0, 100);  // Relaciona o valor analógico à porcentagem
+  ValAnalogIn = analogRead(pinoAnalog);
+  int porcento = map(ValAnalogIn, 1023, 0, 0, 100);
 
-  Serial.print(porcento);  // Imprime o valor em Porcento no monitor Serial
-  Serial.println("%");     // Imprime o símbolo junto ao valor encontrado
+  Serial.print(porcento);
+  Serial.println("%");
 
   lcd.setCursor(0, 0);
-  lcd.print("Umidade ");
   lcd.print(porcento);
-  lcd.print("%");
+  lcd.print("% ");
+  lcd.write((byte)0);
 
   digitalWrite(pinoSensor, LOW);
 
@@ -39,52 +52,55 @@ int readSensor() {
 
 
 void setup() {
-  Serial.begin(9600);  // Declara o BaundRate em 9600
+  Serial.begin(9600);
 
-  pinMode(pinoRele, OUTPUT);        // Declara o pinoRele como Saída
-  pinMode(pinoSensor, OUTPUT);      // Declara o pinoSensor como Saída
-  digitalWrite(pinoSensor, HIGH);   // Põem o pinoSensor em estado Alto = 5V
-  digitalWrite(pinoDisplay, HIGH);  // Põem o pinoSensor em estado Alto = 5V //not working
+  pinMode(pinoRele, OUTPUT);
+  pinMode(pinoSensor, OUTPUT);
 
-  lcd.init();  // Inicializando o LCD
+  lcd.init();
+  lcd.createChar(0, waterDropChar);
+  
+  doIrrigacao();
 
-  doIrrigacao(); //Inicia testando a umidade
+  lcd.setBacklight(HIGH);
 }
 
 void doIrrigacao() {
   int porcento = readSensor();
 
-  while (porcento <= 50) {
+  while (porcento <= 45) {
     Serial.println("Irrigando a planta ...");
     lcd.setCursor(0, 1);
     lcd.print("Irrigando...");
     digitalWrite(pinoRele, HIGH);
 
-    delay(2000);
+    delay(2500);
+    irrigationCounter++;
     porcento = readSensor();
   }
+
+  digitalWrite(pinoRele, LOW);
 }
 
 void loop() {
   unsigned long currentMillis = millis();
-  lcd.setBacklight(LOW);
 
   unsigned long lastUpdateDiff = currentMillis - previousMillis;
-  float lastUpdateDiffInMinutes = (lastUpdateDiff / 1000) / 60;
+  int lastUpdateDiffInMinutes = (int)((lastUpdateDiff / 1000) / 60);
+  int nextSoilAnalysis = intervalOffInMinutes - lastUpdateDiffInMinutes;
+
+  lcd.setCursor(6, 0);
+  lcd.print("Prx. ");
+  lcd.print(nextSoilAnalysis);
+  lcd.print("m");
 
   lcd.setCursor(0, 1);
-  lcd.print(lastUpdateDiffInMinutes);
-  lcd.print(" m atras");
+  lcd.print("Qtd Irr. ");
+  lcd.print(irrigationCounter);
 
   if (lastUpdateDiff >= intervalOff) {
-    digitalWrite(pinoSensor, HIGH);
-
     doIrrigacao();
-
     Serial.println("Planta Irrigada ...");
-    digitalWrite(pinoRele, LOW);
-    digitalWrite(pinoSensor, LOW);
-
     previousMillis = millis();
   }
 }
