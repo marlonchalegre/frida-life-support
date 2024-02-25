@@ -88,16 +88,15 @@ void setup() {
 void doIrrigacao() {
   int porcento = readSensor();
 
-  while (porcento <= 50) {
+  while (porcento <= 47) {
     Serial.println("Irrigando a planta ...");
     digitalWrite(pinoRele, HIGH);
 
     delay(2500);
+    digitalWrite(pinoRele, LOW);
     irrigationCounter++;
     porcento = readSensor();
   }
-
-  digitalWrite(pinoRele, LOW);
 }
 
 void loop() {
