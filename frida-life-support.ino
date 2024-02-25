@@ -32,22 +32,37 @@ byte waterDropChar[8] = {
 
 
 int readSensor() {
+  int mesuresCount = 0;
+  int percentage = 0;
+
   digitalWrite(pinoSensor, HIGH);
 
-  ValAnalogIn = analogRead(pinoAnalog);
-  int porcento = map(ValAnalogIn, 1023, 0, 0, 100);
+  lcd.setCursor(0, 0);
+  lcd.write((byte)0);
+  lcd.print("..");
+  lcd.print("%");
 
-  Serial.print(porcento);
+  while (mesuresCount < 30) {
+    ValAnalogIn = analogRead(pinoAnalog);
+    int currentValue = map(ValAnalogIn, 1023, 0, 0, 100);
+
+    percentage = (currentValue + percentage) / 2;
+
+    mesuresCount++;
+    delay(500);
+  }
+
+  Serial.print(percentage);
   Serial.println("%");
 
   lcd.setCursor(0, 0);
-  lcd.print(porcento);
-  lcd.print("% ");
   lcd.write((byte)0);
+  lcd.print(percentage);
+  lcd.print("%");
 
   digitalWrite(pinoSensor, LOW);
 
-  return porcento;
+  return percentage;
 }
 
 
@@ -58,20 +73,23 @@ void setup() {
   pinMode(pinoSensor, OUTPUT);
 
   lcd.init();
+  lcd.setBacklight(HIGH);
+
   lcd.createChar(0, waterDropChar);
-  
+
   doIrrigacao();
 
-  lcd.setBacklight(HIGH);
+  lcd.setCursor(5, 0);
+  lcd.print("Prox.");
+  lcd.setCursor(0, 1);
+  lcd.print("Qtd Irr. ");
 }
 
 void doIrrigacao() {
   int porcento = readSensor();
 
-  while (porcento <= 45) {
+  while (porcento <= 50) {
     Serial.println("Irrigando a planta ...");
-    lcd.setCursor(0, 1);
-    lcd.print("Irrigando...");
     digitalWrite(pinoRele, HIGH);
 
     delay(2500);
@@ -89,13 +107,17 @@ void loop() {
   int lastUpdateDiffInMinutes = (int)((lastUpdateDiff / 1000) / 60);
   int nextSoilAnalysis = intervalOffInMinutes - lastUpdateDiffInMinutes;
 
-  lcd.setCursor(6, 0);
-  lcd.print("Prx. ");
-  lcd.print(nextSoilAnalysis);
-  lcd.print("m");
 
-  lcd.setCursor(0, 1);
-  lcd.print("Qtd Irr. ");
+  lcd.setCursor(10, 0);
+  lcd.print(nextSoilAnalysis);
+
+  if (nextSoilAnalysis < 100) {
+    lcd.print("m ");
+  } else {
+    lcd.print("m");
+  }
+
+  lcd.setCursor(9, 1);
   lcd.print(irrigationCounter);
 
   if (lastUpdateDiff >= intervalOff) {
@@ -103,4 +125,5 @@ void loop() {
     Serial.println("Planta Irrigada ...");
     previousMillis = millis();
   }
+  delay(2000);
 }
