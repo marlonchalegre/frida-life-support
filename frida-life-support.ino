@@ -92,7 +92,8 @@ void doIrrigacao() {
     Serial.println("Irrigando a planta ...");
     digitalWrite(pinoRele, HIGH);
 
-    delay(2500);
+    delay(4000);
+
     digitalWrite(pinoRele, LOW);
     irrigationCounter++;
     porcento = readSensor();
