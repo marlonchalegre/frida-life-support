@@ -1,15 +1,17 @@
+// Código de Funcionamento para Sistema de Monitoramento e Irrigação com Arduino
+
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
-
-// Código de Funcionamento para Sistema de Monitoramento e Irrigação com Arduino
 
 #define pinoAnalog A0
 #define pinoRele 8
 
+#define MIN_HUMIDITY_PERCENTAGE 48
+
 byte ledState = LOW;
 
 unsigned long previousMillis = 0;
-unsigned long intervalOff = 7200000;  //desligado por 2h
+unsigned long intervalOff = 60000;  //minute; //1800000;  //30m
 int intervalOffInMinutes = (int)((intervalOff / 1000) / 60);
 
 const int dry = 518;  // value for dry sensor
@@ -30,9 +32,10 @@ byte waterDropChar[8] = {
   0b00000
 };
 
-
 void setup() {
   Serial.begin(9600);
+  // bluetooth.begin(9600);
+  Serial1.begin(9600);
 
   pinMode(pinoRele, OUTPUT);
 
@@ -47,26 +50,20 @@ void setup() {
   lcd.print("Qtd Irr. ");
 
   previousMillis = millis() - intervalOff;
+
+  Serial.println("System is running...");
 }
 
 int readSensor() {
-  int mesuresCount = 0;
   int percentage = 0;
+  int valAnalogIn = analogRead(pinoAnalog);
 
   lcd.setCursor(0, 0);
   lcd.write((byte)0);
   lcd.print("..");
   lcd.print("%");
 
-  while (mesuresCount < 5) {
-    int valAnalogIn = analogRead(pinoAnalog);
-    int currentValue = map(valAnalogIn, wet, dry, 100, 0);
-
-    percentage = (currentValue + percentage) / 2;
-
-    mesuresCount++;
-    delay(500);
-  }
+  percentage = map(valAnalogIn, wet, dry, 100, 0);
 
   Serial.print(percentage);
   Serial.println("%");
@@ -80,27 +77,21 @@ int readSensor() {
 }
 
 void doIrrigacao() {
-  int porcento = readSensor();
+  Serial.println("Irrigando a planta ...");
+  digitalWrite(pinoRele, HIGH);
 
-  while (porcento <= 45) {
-    Serial.println("Irrigando a planta ...");
-    digitalWrite(pinoRele, HIGH);
+  delay(12000);
 
-    delay(4000);
-
-    digitalWrite(pinoRele, LOW);
-    irrigationCounter++;
-    porcento = readSensor();
-  }
+  digitalWrite(pinoRele, LOW);
+  irrigationCounter++;
 }
 
 void loop() {
   unsigned long currentMillis = millis();
-
   unsigned long lastUpdateDiff = currentMillis - previousMillis;
+
   int lastUpdateDiffInMinutes = (int)((lastUpdateDiff / 1000) / 60);
   int nextSoilAnalysis = intervalOffInMinutes - lastUpdateDiffInMinutes;
-
 
   lcd.setCursor(10, 0);
   lcd.print(nextSoilAnalysis);
@@ -114,10 +105,25 @@ void loop() {
   lcd.setCursor(9, 1);
   lcd.print(irrigationCounter);
 
+  if (Serial1.available()) {
+    int dadoBluetooth = Serial1.read();
+
+    if (dadoBluetooth == '1') {
+      doIrrigacao();
+    }
+    if (dadoBluetooth == '0') {
+      Serial1.println(readSensor());
+    }
+  }
+
   if (lastUpdateDiff >= intervalOff) {
-    doIrrigacao();
-    Serial.println("Planta Irrigada ...");
+    int humidityPercentage = readSensor();
+    if (humidityPercentage < MIN_HUMIDITY_PERCENTAGE) {
+      doIrrigacao();
+    }
+
     previousMillis = millis();
   }
-  delay(2000);
+  
+  delay(200);
 }
